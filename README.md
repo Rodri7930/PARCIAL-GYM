@@ -17,3 +17,22 @@ Visual Studio Code
 Git
 
 GitHub
+
+
+Flujo de trabajo Git
+
+El proyecto utiliza Git y GitHub para controlar versiones y trabajar de forma colaborativa.
+
+Los cambios se realizan en ramas de funcionalidad y posteriormente se integran a la rama principal mediante Pull Requests.
+
+Flujo utilizado:
+
+- Actualizar la rama local.
+- Crear una rama de funcionalidad.
+- Realizar los cambios.
+- Ejecutar las pruebas.
+- Crear un commit.
+- Subir la rama a GitHub.
+- Crear un Pull Request.
+- Revisar y aprobar los cambios.
+- Integrar los cambios a main.
