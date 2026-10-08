@@ -1,7 +1,13 @@
 import unittest
 
 from src.domain.models import Socio, PlanMembresia
-from src.domain.exceptions import ValidationError
+from src.domain.exceptions import (
+    DomainError,
+    ValidationError,
+    DuplicateEntityError,
+    EntityNotFoundError,
+    InvalidMembershipError,
+)
 
 
 class TestSocio(unittest.TestCase):
@@ -45,6 +51,25 @@ class TestPlanMembresia(unittest.TestCase):
     def test_rechazar_duracion_cero(self):
         with self.assertRaises(ValidationError):
             PlanMembresia("P001", "Premium", 120, 0)
+
+
+class TestDomainExceptions(unittest.TestCase):
+
+    def test_validation_error_hereda_de_domain_error(self):
+        self.assertTrue(issubclass(ValidationError, DomainError))
+
+    def test_duplicate_entity_error_hereda_de_domain_error(self):
+        self.assertTrue(issubclass(DuplicateEntityError, DomainError))
+
+    def test_entity_not_found_error_hereda_de_domain_error(self):
+        self.assertTrue(issubclass(EntityNotFoundError, DomainError))
+
+    def test_invalid_membership_error_hereda_de_domain_error(self):
+        self.assertTrue(issubclass(InvalidMembershipError, DomainError))
+
+    def test_validation_error_puede_lanzarse(self):
+        with self.assertRaises(ValidationError):
+            raise ValidationError("Datos inválidos")
 
 
 if __name__ == "__main__":
