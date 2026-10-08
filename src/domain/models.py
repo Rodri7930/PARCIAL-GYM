@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from .exceptions import ValidationError
 
 
@@ -65,3 +67,48 @@ class Socio:
     @property
     def correo(self):
         return self.__correo
+    
+
+class PlanMembresia:
+    """Representa un plan de membresía del gimnasio."""
+
+    def __init__(self, id_plan, nombre, precio, duracion_dias):
+        self.__id_plan = Socio._validar_obligatorio(id_plan, "ID del plan")
+        self.__nombre = Socio._validar_obligatorio(nombre, "Nombre del plan")
+        self.__precio = self._validar_precio(precio)
+        self.__duracion_dias = self._validar_duracion(duracion_dias)
+
+    @staticmethod
+    def _validar_precio(precio):
+        try:
+            valor = Decimal(str(precio))
+        except (InvalidOperation, ValueError):
+            raise ValidationError("El precio debe ser un número válido.")
+
+        if not valor.is_finite() or valor <= 0:
+            raise ValidationError("El precio debe ser mayor que cero.")
+
+        return valor
+
+    @staticmethod
+    def _validar_duracion(duracion):
+        if type(duracion) is not int or duracion <= 0:
+            raise ValidationError("La duración debe ser un entero mayor que cero.")
+
+        return duracion
+
+    @property
+    def id_plan(self):
+        return self.__id_plan
+
+    @property
+    def nombre(self):
+        return self.__nombre
+
+    @property
+    def precio(self):
+        return self.__precio
+
+    @property
+    def duracion_dias(self):
+        return self.__duracion_dias
