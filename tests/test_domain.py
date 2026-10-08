@@ -35,6 +35,21 @@ class TestSocio(unittest.TestCase):
                 "123", "987654321", "juan@gmail.com"
             )
 
+    def test_rechazar_correos_invalidos(self):
+        correos_invalidos = [
+            "juan..perez@gmail.com",
+            "juan@gmail..com",
+            "juan perez@gmail.com",
+        ]
+
+        for correo in correos_invalidos:
+            with self.subTest(correo=correo):
+                with self.assertRaises(ValidationError):
+                    Socio(
+                        "S001", "Juan", "Perez",
+                        "12345678", "987654321", correo
+                    )
+
 
 class TestPlanMembresia(unittest.TestCase):
 

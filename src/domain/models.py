@@ -32,14 +32,29 @@ class Socio:
             raise ValidationError("El teléfono debe contener exactamente 9 dígitos.")
         return telefono
 
+    
+
     @staticmethod
     def _validar_correo(correo):
         correo = Socio._validar_obligatorio(correo, "Correo")
-        if correo.count("@") != 1:
+
+        if correo.count("@") != 1 or any(caracter.isspace() for caracter in correo):
             raise ValidationError("El correo debe tener un formato válido.")
 
         usuario, dominio = correo.split("@")
-        if not usuario or "." not in dominio or dominio.startswith(".") or dominio.endswith("."):
+
+        if (
+            not usuario
+            or not dominio
+            or "." not in dominio
+            or usuario.startswith(".")
+            or usuario.endswith(".")
+            or ".." in usuario
+            or dominio.startswith(".")
+            or dominio.endswith(".")
+            or ".." in dominio
+            or any(not parte for parte in dominio.split("."))
+        ):
             raise ValidationError("El correo debe tener un formato válido.")
 
         return correo
@@ -67,6 +82,7 @@ class Socio:
     @property
     def correo(self):
         return self.__correo
+    
     
 
 class PlanMembresia:
