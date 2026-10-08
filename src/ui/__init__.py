@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 import re
 import tkinter as tk
 from tkinter import messagebox, ttk
+import traceback
 import unicodedata
 
 __all__ = ["Theme", "FieldSpec", "Column", "StatCard", "HeroBanner",
@@ -184,7 +185,7 @@ class DataTable(tk.Frame):
         super().__init__(parent, bg=Theme.SURFACE, highlightbackground=Theme.BORDER,
                          highlightthickness=1)
         self.columns = tuple(columns)
-        self.search_keys = tuple(search_keys or [column.key for column in columns])
+        self.search_keys = tuple(search_keys or [column.key for column in self.columns])
         self.on_select = on_select
         self._rows, self._visible = [], []
         self._sort_key, self._descending = None, False
@@ -195,6 +196,9 @@ class DataTable(tk.Frame):
         self.query = tk.StringVar(self)
         self.search = ttk.Entry(top, textvariable=self.query, style="Gym.TEntry", width=26)
         self.search.pack(side="left", fill="x", expand=True)
+        self.clear_button = Theme.button(top, "Limpiar", self.clear_query, "secondary", padx=10, pady=7)
+        self.clear_button.pack(side="left", padx=(8, 0))
+        self.search.bind("<Escape>", self.clear_query)
         self.count = tk.Label(top, text="", bg=Theme.SURFACE, fg=Theme.MUTED,
                               font=(Theme.FONT, 9))
         self.count.pack(side="right", padx=(12, 0))
@@ -202,7 +206,7 @@ class DataTable(tk.Frame):
         container.pack(fill="both", expand=True)
         container.columnconfigure(0, weight=1)
         container.rowconfigure(0, weight=1)
-        self.tree = ttk.Treeview(container, columns=[c.key for c in columns], show="headings",
+        self.tree = ttk.Treeview(container, columns=[c.key for c in self.columns], show="headings",
                                  selectmode="browse", style="Gym.Treeview", height=8)
         self.tree.grid(row=0, column=0, sticky="nsew")
         vertical = ttk.Scrollbar(container, orient="vertical", command=self.tree.yview,
@@ -211,7 +215,7 @@ class DataTable(tk.Frame):
         vertical.grid(row=0, column=1, sticky="ns")
         horizontal.grid(row=1, column=0, sticky="ew")
         self.tree.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
-        for col in columns:
+        for col in self.columns:
             self.tree.heading(col.key, text=col.title,
                               command=lambda key=col.key: self.sort_by(key))
             self.tree.column(col.key, width=col.width, minwidth=85, anchor=col.anchor, stretch=True)
@@ -231,6 +235,12 @@ class DataTable(tk.Frame):
 
     def set_query(self, text):
         self.query.set(text)
+
+    def clear_query(self, _event=None):
+        """Recupera todos los registros y devuelve el foco al buscador."""
+        self.query.set("")
+        self.search.focus_set()
+        return "break"
 
     def visible_rows(self):
         return deepcopy(self._visible)
@@ -255,7 +265,12 @@ class DataTable(tk.Frame):
                     pass
                 return (1, _search_text(value))
             rows.sort(key=sort_value, reverse=self._descending)
+        for column in self.columns:
+            indicator = (" ▼" if self._descending else " ▲") if column.key == self._sort_key else ""
+            self.tree.heading(column.key, text=column.title + indicator)
+        self.clear_button.configure(state="normal" if self.query.get() else "disabled")
         previous = self.selected_row()
+        previous_id = previous.get("id") if previous else None
         self._visible = rows
         children = self.tree.get_children()
         if children:
@@ -267,7 +282,7 @@ class DataTable(tk.Frame):
                 values.append(column.formatter(value) if column.formatter else value)
             tags = ("odd" if index % 2 else "even", str(row.get("estado", "")))
             self.tree.insert("", "end", iid=str(index), values=values, tags=tags)
-            if previous and row.get("id") == previous.get("id"):
+            if previous_id is not None and row.get("id") == previous_id:
                 self.tree.selection_set(str(index))
         self.count.configure(text=f"{len(rows)} / {len(self._rows)} registros")
         self.empty.configure(text=("Sin resultados para esta búsqueda." if self._rows else
@@ -304,15 +319,26 @@ class EntitySelector(tk.Frame):
         self.set_choices(choices)
 
     def set_choices(self, choices):
-        self._labels, self._by_id = {}, {}
+        missing = object()
+        previous_text = self.variable.get()
+        previous_id = self._labels.get(previous_text, missing)
+        labels, by_id = {}, {}
         for identifier, label in choices:
             display = str(label)
-            if display in self._labels:
+            if display in labels:
                 display += f" · {identifier}"
-            self._labels[display] = identifier
-            self._by_id[identifier] = display
-        self.variable.set("")
-        self.combo.configure(values=tuple(self._labels), state="normal" if choices else "disabled")
+                base, suffix = display, 2
+                while display in labels:
+                    display = f"{base} ({suffix})"
+                    suffix += 1
+            labels[display] = identifier
+            by_id[identifier] = display
+        self._labels, self._by_id = labels, by_id
+        preserved = previous_id is not missing and previous_id in by_id
+        self.variable.set(by_id[previous_id] if preserved else "")
+        self.combo.configure(values=tuple(labels), state="normal" if labels else "disabled")
+        if not preserved and (previous_id is not missing or previous_text):
+            self._notify_change()
 
     def value(self):
         label = self.variable.get()
@@ -330,14 +356,22 @@ class EntitySelector(tk.Frame):
         self._change = callback
 
     def _changed(self, _event=None):
+        # Tras elegir un resultado, la próxima apertura vuelve a ofrecer toda la lista.
+        self.combo.configure(values=tuple(self._labels))
+        self._notify_change()
+
+    def _notify_change(self):
         if self._change:
             self._change()
 
     def _typed(self, _event=None):
+        if _event and _event.keysym in ("Return", "KP_Enter", "Tab", "Escape", "Up", "Down",
+                                       "Left", "Right", "Home", "End"):
+            return
         query = _search_text(self.variable.get())
         self.combo.configure(values=tuple(label for label in self._labels
                                           if query in _search_text(label)))
-        self._changed()
+        self._notify_change()
 
 
 class FormDialog(tk.Toplevel):
@@ -349,6 +383,8 @@ class FormDialog(tk.Toplevel):
         self.resizable(False, False)
         self.fields, self.on_submit = tuple(fields), on_submit
         self.variables, self.controls = {}, {}
+        self._submitting = False
+        self._invalid_field = None
         header = tk.Frame(self, bg=Theme.NAVY)
         header.pack(fill="x")
         tk.Label(header, text=title, bg=Theme.NAVY, fg="white",
@@ -381,6 +417,11 @@ class FormDialog(tk.Toplevel):
         self.error = tk.Label(body, text="", bg=Theme.SURFACE, fg=Theme.ERROR,
                               anchor="w", justify="left", wraplength=450)
         self.error.pack(fill="x", pady=(0, 5))
+        for field in self.fields:
+            if field.key in self.variables:
+                self.variables[field.key].trace_add("write", lambda *_, key=field.key: self._field_changed(key))
+            else:
+                self.controls[field.key].bind_change(lambda key=field.key: self._field_changed(key))
         footer = tk.Frame(body, bg=Theme.SURFACE)
         footer.pack(fill="x", pady=(4, 0))
         Theme.button(footer, "Cancelar", self.destroy, "secondary").pack(side="left")
@@ -433,36 +474,83 @@ class FormDialog(tk.Toplevel):
             value = value.replace(",", ".")
         return value
 
+    def _read_field(self, field):
+        control = self.controls[field.key]
+        if field.kind == "choice":
+            try:
+                return "" if not field.required and not control.variable.get() else control.value()
+            except InputError as exc:
+                raise InputError(f"{field.label}: selecciona una opción de la lista.") from exc
+        return self._validate(field, self.variables[field.key].get())
+
     def values(self):
         result = {}
+        self._invalid_field = None
         for field in self.fields:
-            control = self.controls[field.key]
-            if field.kind == "choice":
-                try:
-                    result[field.key] = ("" if not field.required and not control.variable.get()
-                                         else control.value())
-                except InputError as exc:
-                    raise InputError(f"{field.label}: selecciona una opción de la lista.") from exc
-            else:
-                result[field.key] = self._validate(field, self.variables[field.key].get())
+            try:
+                result[field.key] = self._read_field(field)
+            except InputError:
+                self._invalid_field = field.key
+                raise
         return result
 
+    def _field_changed(self, key):
+        if self._submitting or not self.error["text"]:
+            return
+        if self._invalid_field is not None:
+            if key != self._invalid_field:
+                return
+            field = next(field for field in self.fields if field.key == key)
+            try:
+                self._read_field(field)
+            except InputError:
+                return
+        self.error.configure(text="")
+        self._invalid_field = None
+
+    def _focus_invalid_field(self):
+        if self._invalid_field is not None:
+            control = self.controls[self._invalid_field]
+            widget = control.combo if isinstance(control, EntitySelector) else control
+            widget.focus_set()
+            widget.selection_range(0, tk.END)
+
+    def _is_open(self):
+        try:
+            return bool(self.winfo_exists())
+        except tk.TclError:
+            return False
+
     def submit(self):
+        if self._submitting or not self._is_open():
+            return False
         try:
             payload = self.values()
         except InputError as exc:
             self.error.configure(text=str(exc))
+            self._focus_invalid_field()
             return False
+        self._submitting = True
+        self.error.configure(text="")
         self.save.configure(state="disabled")
         try:
-            error = self.on_submit(payload)
+            try:
+                error = self.on_submit(payload)
+            except InputError as exc:
+                error = str(exc)
+            except Exception:
+                traceback.print_exc()
+                error = "No se pudo guardar. Revisa la operación e inténtalo nuevamente."
+            if not self._is_open():
+                return error is None
             if error is not None:
                 self.error.configure(text=str(error))
                 return False
             self.destroy()
             return True
         finally:
-            if self.winfo_exists():
+            self._submitting = False
+            if self._is_open():
                 self.save.configure(state="normal")
 
 
