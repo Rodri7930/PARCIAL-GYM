@@ -73,11 +73,17 @@ class PlanMembresia:
     """Representa un plan de membresía del gimnasio."""
 
     def __init__(self, id_plan, nombre, precio, duracion_dias):
-        self.__id_plan = Socio._validar_obligatorio(id_plan, "ID del plan")
-        self.__nombre = Socio._validar_obligatorio(nombre, "Nombre del plan")
+        self.__id_plan = self._validar_obligatorio(id_plan, "ID del plan")
+        self.__nombre = self._validar_obligatorio(nombre, "Nombre del plan")
         self.__precio = self._validar_precio(precio)
         self.__duracion_dias = self._validar_duracion(duracion_dias)
 
+    @staticmethod
+    def _validar_obligatorio(valor, campo):
+        if not isinstance(valor, str) or not valor.strip():
+            raise ValidationError(f"{campo} es obligatorio.")
+        return valor.strip()
+    
     @staticmethod
     def _validar_precio(precio):
         try:
