@@ -1,6 +1,7 @@
 """APORTE UI 1: ventana, navegación y controladores de NEXO GYM.
 
 Rama: feature/ui-1. Conserva el nombre exigido por la rúbrica.
+Actualizar conserva búsqueda, selección y desplazamiento de la vista.
 Importa componentes de UI 2 y consume un servicio inyectado. No usa JSON,
 no calcula vigencia y no realiza operaciones comerciales por su cuenta.
 """
@@ -9,7 +10,7 @@ import tkinter as tk
 from tkinter import ttk
 import traceback
 
-from src.domain.exceptions import GymError
+from src.domain.exceptions import DomainError
 from src.ui import (AccessResult, Column, DataTable, EntitySelector, FieldSpec,
                     FormDialog, HeroBanner, InputError, Notifier, StatCard,
                     Theme, format_date, format_money)
@@ -134,7 +135,7 @@ class GymInterface:
     def _guard(self, action):
         try:
             return action()
-        except (GymError, InputError) as exc:
+        except (DomainError, InputError) as exc:
             self.notifier.show(str(exc), "error")
         except Exception:
             traceback.print_exc()
@@ -179,7 +180,53 @@ class GymInterface:
         self._content_resized()
 
     def refresh(self):
+        """Consulta datos nuevos manteniendo el contexto de la pantalla actual."""
+        state = self._capture_view_state()
         self.navigate(self.page)
+        self._restore_view_state(state)
+
+    def _capture_view_state(self):
+        state = {"canvas_y": self.canvas.yview()[0]}
+        if self.table is not None and self.table.winfo_exists():
+            selected = self.table.selected_row()
+            state["table"] = {"query": self.table.query.get(),
+                              "selected_id": selected.get("id") if selected else None,
+                              "x": self.table.tree.xview()[0],
+                              "y": self.table.tree.yview()[0],
+                              "search_focused": self.root.focus_get() == self.table.search}
+        if self.page == "acceso" and getattr(self, "access_selector", None) is not None:
+            if self.access_selector.winfo_exists():
+                try:
+                    state["access_id"] = self.access_selector.value()
+                except InputError:
+                    pass
+        return state
+
+    def _restore_view_state(self, state):
+        table_state = state.get("table")
+        if table_state is not None and self.table is not None:
+            self.table.set_query(table_state["query"])
+            selected_id = table_state["selected_id"]
+            if selected_id is not None:
+                for item, row in zip(self.table.tree.get_children(), self.table.visible_rows()):
+                    if row.get("id") == selected_id:
+                        self.table.tree.selection_set(item)
+                        self.table.tree.focus(item)
+                        break
+            self.table.tree.xview_moveto(table_state["x"])
+            self.table.tree.yview_moveto(table_state["y"])
+            if table_state["search_focused"]:
+                self.table.search.focus_set()
+        if self.page == "acceso" and "access_id" in state:
+            if getattr(self, "access_selector", None) is not None and self.access_selector.winfo_exists():
+                try:
+                    # Se conserva el socio, pero nunca una autorización anterior.
+                    self.access_selector.select(state["access_id"])
+                except InputError:
+                    pass  # El socio ya no está en la lista: queda sin selección.
+        self.root.update_idletasks()
+        self._content_resized()
+        self.canvas.yview_moveto(state["canvas_y"])
 
     def _add_action(self, text, command):
         Theme.button(self.header_actions, text, command).pack(side="left", padx=(8, 0))
@@ -454,7 +501,7 @@ class GymInterface:
         def save(payload):
             try:
                 method(**payload)
-            except GymError as exc:
+            except DomainError as exc:
                 return str(exc)
             except Exception:
                 traceback.print_exc()
