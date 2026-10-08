@@ -60,6 +60,17 @@ class AppService:
 
         return self._socios[id_socio]
 
+    def buscar_socio_por_dni(self, dni):
+        """Busca un socio registrado mediante su DNI."""
+
+        for socio in self._socios.values():
+            if socio.dni == dni:
+                return socio
+
+        raise EntityNotFoundError(
+            "No existe un socio registrado con ese DNI."
+        )
+
     # =====================================
     # GESTIÓN DE PLANES
     # =====================================
