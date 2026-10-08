@@ -16,3 +16,4 @@ def test_load_non_existent_file(tmp_path):
     manager = DataManager(data_folder=str(tmp_path))
     resultado = manager.load_data("archivo_que_no_existe")
     assert resultado == []
+
