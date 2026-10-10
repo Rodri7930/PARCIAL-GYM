@@ -52,7 +52,7 @@ La carpeta `src/services/` contiene la lógica de aplicación.
 
 La clase `AppService` coordina las operaciones entre la interfaz y las entidades del dominio.
 
-Actualmente se encarga de operaciones relacionadas con socios, planes y validación de fechas de vencimiento.
+Actualmente se encarga de operaciones relacionadas con socios, planes, membresías, entrenadores, control de acceso, asistencias y validación de fechas de vencimiento.
 
 ### Interfaz
 
@@ -116,6 +116,8 @@ Estas pruebas permiten comprobar las validaciones y comportamiento de las entida
 
 ## Persistencia
 
-Actualmente los datos manejados por `AppService` se almacenan temporalmente en memoria.
+Actualmente los datos manejados por `AppService` se almacenan temporalmente en memoria mediante diccionarios y listas.
 
-La integración de una solución de persistencia mediante archivos queda separada de la interfaz y debe pertenecer a la capa de servicios.
+Por el momento no se utiliza una base de datos ni archivos para guardar los datos de forma permanente.
+
+En caso de implementar persistencia posteriormente, esta debe mantenerse separada de la interfaz y pertenecer a la capa de servicios.
