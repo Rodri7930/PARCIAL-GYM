@@ -16,3 +16,5 @@ class EntityNotFoundError(DomainError):
 
 class InvalidMembershipError(DomainError):
     """Error cuando una membresía no cumple las reglas del dominio."""
+
+GymError = DomainError
